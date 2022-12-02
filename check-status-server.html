@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Check Server Status</title>
+    <style>
+        .main {
+            background-color: rgb(0, 0, 0);
+            font-size: 25px;
+            color: aliceblue;
+        }
+
+        .div_master {
+            background-color: blue;
+            margin-right: 45%;
+        }
+
+        .dot {
+            height: 25px;
+            width: 25px;
+            background-color: rgb(255, 255, 255);
+            border-radius: 50%;
+            vertical-align: middle;
+            display: inline-block;
+        }
+
+        /* Create two equal columns that floats next to each other */
+        .column {
+            float: left;
+            width: 250px;
+            padding: 10px;
+            background-color: darkgray;
+            color: black;
+            border: solid 1px black;
+        }
+
+        .column p {
+            font-size: small;
+        }
+
+        /* Clear floats after the columns */
+        .row:after {
+            content: "";
+            display: table;
+            clear: both;
+        }
+
+
+        /* The popup form - hidden by default */
+        .form-popup {
+            display: none;
+            position: fixed;
+            border: 3px solid white;
+            color: black;
+            z-index: 9;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        /* Button used to open the contact form - fixed at the bottom of the page */
+        .open-button {
+            background-color: darkgray;
+            color: white;
+            padding: 16px 20px;
+            border: none;
+            cursor: pointer;
+            opacity: 0.8;
+            bottom: 23px;
+            right: 28px;
+            width: 280px;
+        }
+
+        .form-container {
+            padding: 10px;
+            background-color: darkgray
+        }
+
+        .form-container input[type="text"] {
+            width: 500px;
+        }
+
+        .form-btn {
+            background-color: #4CAF50;
+            /* Green */
+            border: none;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            border-radius: 5%;
+        }
+
+        .form-btn:hover {
+            background-color: #53c056;
+        }
+
+        .btn-cancel {
+            background-color: red;
+        }
+
+        .btn-delete {
+            background-color: rgb(255, 0, 0);
+            color: white;
+            padding: 5px 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            opacity: 0.8;
+            width: fit-content;
+        }
+
+        .btn-cancel:hover,
+        .btn-delete:hover {
+            background-color: rgb(253, 82, 82);
+        }
+    </style>
+    <script>
+        key_storage = 'status_server_all_aps'
+        dragindex = 0;
+        clone = ' ';
+        toggleDelete = '';
+
+        // On site loaded do
+        window.addEventListener("load", function (event) {
+            if (localStorage.getItem(key_storage)) {
+                montarDadosSalvos();
+            }
+        }, false);
+
+        function uuid() {
+            // Font: Stackoverflow
+            return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c =>
+                (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+            );
+        }
+
+        async function checkServer(url, timeout, elm) {
+            elm = document.getElementById(elm);
+
+            while (true) {
+                // if element is removed, then stop async function on that url
+                if (elm == 'undefined') {
+                    return;
+                }
+
+                try {
+                    color = '#eb1414'; //red color
+                    await fetch(url, { mode: 'no-cors' }).then(r => {
+                        color = '#31eb14'; //green color
+                    })
+
+                    elm.style.backgroundColor = color;
+                } catch (error) {
+                    console.log(error)
+                    // if an error ocurred, then red color as status
+                    elm.style.backgroundColor = '#eb1414';
+                }
+
+                await new Promise(r => setTimeout(r, timeout * 1000));
+            }
+        }
+
+        function drag(e) {
+            e.dataTransfer.setData('text', e.target.id)
+        }
+
+        function allowDrop(e) {
+            e.preventDefault();
+        }
+
+        function drop(e) {
+            // Font: Stackoverflow
+            e.preventDefault();
+            target = e.target.closest('.column');
+            clone = target.cloneNode(true);
+            let data = e.dataTransfer.getData('text');
+            if (clone.id !== data) {
+                let nodelist = document.getElementById('row').childNodes;
+                for (let i = 0; i < nodelist.length; i++) {
+                    if (nodelist[i].id === data) {
+                        dragindex = i;
+                    }
+                }
+
+                document.getElementById('row').replaceChild(document.getElementById(data), target);
+                document.getElementById('row').insertBefore(clone, document.getElementById('row').childNodes[dragindex]);
+
+                remapStorage();
+            }
+        }
+
+        function remapStorage() {
+            cards = document.getElementById('row').querySelectorAll('div.column');
+            tmp_array = [];
+
+            cards.forEach(element => {
+                tmp_array.push({
+                    "id": element.id,
+                    "description": element.querySelector('h3').textContent,
+                    "url": element.querySelector('p').textContent,
+                })
+            });
+
+            if (tmp_array) {
+                window.localStorage.setItem(key_storage, JSON.stringify(tmp_array));
+            }
+        }
+
+        function openFormAdd() {
+            // Display div with form
+            document.getElementById("myForm").style.display = "block";
+        }
+
+        function closeForm() {
+            // Hide div with form
+            div = document.getElementById("myForm")
+            div.style.display = "none";
+
+            // Clear the input fields when closing model
+            inputs = div.querySelectorAll("input[type='text']");
+            inputs.forEach(elm => {
+                elm.value = ''
+            });
+        }
+
+        function addUrl(form, save_storage = true) {
+
+            inputs = form.elements;
+            id_column = uuid();
+            description = inputs.description.value;
+            url = inputs.url.value;
+
+            addCard(id_column, description, url)
+
+            if (!save_storage) {
+                return;
+            }
+
+            storage = window.localStorage.getItem(key_storage);
+
+            remapStorage();
+        }
+
+        function toggleDeleteBtn() {
+            buttons = cards = document.getElementById('row').querySelectorAll('button.btn-delete');
+            toggleDelete = toggleDelete ? '' : 'block';
+            buttons.forEach(btn => {
+                // Show or hide the button
+                btn.style.display = toggleDelete;
+            });
+        }
+
+        function addCard(id, description, url) {
+            // Clone the template into a new div with random element id
+            clone = document.getElementById('template_column').cloneNode(true);
+            clone.id = id;
+            clone.style.display = 'block';
+
+            pattern = new RegExp('^(http://)|^(https://)');
+            if (!pattern.test(url)) {
+                url = 'https://' + url;
+            }
+
+            try {
+                new URL(url);
+            } catch (error) {
+                alert('Invalid URL');
+                return;
+            }
+
+            // Set the values in the tags before insert
+            clone.querySelector('h3').textContent = description
+            clone.querySelector('p').textContent = url
+
+            // if is showing delete buttos already toggle it
+            clone.querySelector('button.btn-delete').style.display = toggleDelete;
+
+            // Add the new element into de row div
+            row = document.getElementById('row');
+            row.appendChild(clone);
+
+            checkServer(url, 10, id);
+        }
+
+        function deleteCard(elm) {
+            elm.closest('.column').remove();
+            remapStorage();
+        }
+
+        function montarDadosSalvos() {
+            storage_array = JSON.parse(localStorage.getItem(key_storage));
+
+            storage_array.forEach(e => {
+                addCard(e.id, e.description, e.url)
+            });
+        }
+
+        function exportData() {
+            storage_string = localStorage.getItem(key_storage);
+
+            if (storage_string) {
+                filename = (new Date()).toISOString() + '_exported_server_status.json'
+
+                element = document.createElement('a');
+                element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(storage_string));
+                element.setAttribute('download', filename);
+
+                element.style.display = 'none';
+                document.body.appendChild(element);
+
+                element.click();
+                document.body.removeChild(element);
+
+                return;
+            }
+
+            alert('No data to export!!');
+        }
+    </script>
+</head>
+
+<body class="main">
+    <div id="template_column" class="column" draggable="true" ondragstart="drag(event)" ondrop="drop(event)"
+        ondragover="allowDrop(event)" hidden>
+        <button class="btn-delete" onclick="deleteCard(this)" hidden>Delete</button>
+        <h3></h3>
+        <p></p>
+    </div>
+    <div style="text-align: center;">
+        <button class="open-button" onclick="openFormAdd()">Add</button>
+        <button class="open-button btn-cancel" onclick="toggleDeleteBtn()">Remove</button>
+        <button class="open-button" onclick="exportData()" hidden>Export</button>
+    </div>
+    <br>
+
+    <div class="form-popup" id="myForm">
+        <form onsubmit="addUrl(this)" action="javascript:void(0);" class="form-container">
+            <h2>Register</h2>
+
+            <label for="description"><b>Description</b></label><br>
+            <input type="text" placeholder="Description" name="description" required><br>
+
+            <label for="url"><b>URL Server</b></label><br>
+            <input type="text" placeholder="URL Server" name="url" required><br>
+            <br>
+            <button type="submit" class="form-btn">Register</button>
+            <button type="button" class="form-btn btn-cancel" onclick="closeForm()">Cancel</button>
+        </form>
+    </div>
+
+    <div id="row" class="row">
+    </div>
+</body>
+
+</html>
